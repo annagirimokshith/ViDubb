@@ -18,6 +18,7 @@ install_if_not_installed('packaging', 'pip install packaging==20.9')
 install_if_not_installed('openai-whisper', 'pip install openai-whisper==20240930')
 install_if_not_installed('deepface', 'pip install deepface==0.0.93')
 install_if_not_installed('google.cloud.texttospeech', 'pip install google-cloud-texttospeech==2.16.3')
+install_if_not_installed('requests', 'pip install requests==2.31.0')
 os.system('pip install numpy==1.26.4 > /dev/null 2>&1')
 
 from pyannote.audio import Pipeline
@@ -56,6 +57,7 @@ from tools.utils import extract_and_save_most_common_face
 from tools.utils import get_overlap
 from tools.enhanced_tts import EnhancedTTS
 from config.google_cloud_setup import setup_google_cloud_credentials, validate_google_cloud_credentials
+from tools.translation_service import setup_translation_service
 
         
 nltk.download('punkt')
@@ -68,7 +70,7 @@ class VideoDubbing:
     def __init__(self, Video_path, source_language, target_language, 
                  LipSync=True, Voice_denoising = True, whisper_model="turbo",
                  Context_translation = "API code here", huggingface_auth_token="API code here",
-                 use_google_tts=False):
+                 use_google_tts=False, translation_provider="auto"):
         
         self.Video_path = Video_path
         self.source_language = source_language
@@ -79,6 +81,7 @@ class VideoDubbing:
         self.Context_translation = Context_translation
         self.huggingface_auth_token = huggingface_auth_token
         self.use_google_tts = use_google_tts
+        self.translation_provider = translation_provider
         
         os.system("rm -r audio")
         os.system("mkdir audio")
@@ -361,9 +364,11 @@ class VideoDubbing:
                         'None': None}
     
 
-        if not self.Context_translation:
-
-            # Function to translate text
+        # Initialize enhanced translation service
+        translation_service = setup_translation_service()
+        
+        if not self.Context_translation or self.Context_translation == "API code here":
+            # Function to translate text using MarianMT (fallback)
             def translate(sentence):
                 if self.source_language == 'tr':
                     model_name = f"Helsinki-NLP/opus-mt-trk-{self.target_language}"
@@ -383,41 +388,55 @@ class VideoDubbing:
                 translated = model.generate(**inputs)
                 return tokenizer.decode(translated[0], skip_special_tokens=True)
         else:
-            client = Groq(api_key=self.Context_translation)
-
-            def translate(sentence, before_context, after_context, target_language):
-                chat_completion = client.chat.completions.create(
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"""
-                        Role: You are a professional translator who translates concisely in short sentence while preserving meaning.
-                        Instruction:
-                        Translate the given sentence into {target_language}
-                        
-                      
-                        Sentence: {sentence}
+            # Use enhanced translation service with multiple providers
+            def translate(sentence, before_context="", after_context=""):
+                # Try enhanced translation service first
+                result = translation_service.translate(
+                    sentence=sentence,
+                    before_context=before_context,
+                    after_context=after_context,
+                    target_language=self.target_language,
+                    provider=self.translation_provider
+                )
                 
-                        
-                        Output format:
-                        [[sentence translation: <your translation>]]
-                        """,
-                    }
-                ],
-                model="llama3-70b-8192",
-            )
-            # return chat_completion.choices[0].message.content
-                # Regex pattern to extract the translation
-                pattern = r'\[\[sentence translation: (.*?)\]\]'
+                if result:
+                    return result
                 
-                # Extracting the translation
-                match = re.search(pattern, chat_completion.choices[0].message.content)
-                
+                # Fallback to original Groq implementation
                 try:
-                    translation = match.group(1)
-                    return translation
-                except:
-                    return 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                    client = Groq(api_key=self.Context_translation)
+                    chat_completion = client.chat.completions.create(
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": f"""
+                                Role: You are a professional translator who translates concisely in short sentence while preserving meaning.
+                                Instruction:
+                                Translate the given sentence into {self.target_language}
+                                
+                              
+                                Sentence: {sentence}
+                        
+                                
+                                Output format:
+                                [[sentence translation: <your translation>]]
+                                """,
+                            }
+                        ],
+                        model="llama3-70b-8192",
+                    )
+                    
+                    # Regex pattern to extract the translation
+                    pattern = r'\[\[sentence translation: (.*?)\]\]'
+                    match = re.search(pattern, chat_completion.choices[0].message.content)
+                    
+                    if match:
+                        return match.group(1)
+                    else:
+                        return chat_completion.choices[0].message.content.strip()
+                except Exception as e:
+                    print(f"Translation fallback failed: {e}")
+                    return sentence  # Return original if all translation methods fail
                     
                
 
@@ -427,13 +446,14 @@ class VideoDubbing:
         audio = AudioSegment.from_file(audio_file, format="mp4")
         for i in range(len(new_record)):
             final_sentance = new_record[i][0]
-            if not self.Context_translation:
+            
+            if not self.Context_translation or self.Context_translation == "API code here":
                 translated = translate(sentence=final_sentance)
-                
             else:
                 before_context = new_record[i-1][0] if i - 1 in range(len(new_record)) else ""
                 after_context = new_record[i+1][0] if i + 1 in range(len(new_record)) else ""
-                translated = translate(sentence=final_sentance, before_context=before_context, after_context=after_context, target_language=self.target_language )
+                translated = translate(sentence=final_sentance, before_context=before_context, after_context=after_context)
+            
             speaker = most_occured_speaker
             
             max_overlap = 0
@@ -697,7 +717,7 @@ language_mapping = {
 }
 
 
-def process_video(video, source_language, target_language, use_wav2lip, whisper_model, bg_sound, use_google_tts):
+def process_video(video, source_language, target_language, use_wav2lip, whisper_model, bg_sound, use_google_tts, translation_provider):
     try:
         os.system("rm video_path.mp4")
         video_path = None
@@ -717,7 +737,8 @@ def process_video(video, source_language, target_language, use_wav2lip, whisper_
             whisper_model, 
             "", 
             os.getenv('HF_TOKEN'),
-            use_google_tts
+            use_google_tts,
+            translation_provider
         )
         if  use_wav2lip and not bg_sound:
             source_path = 'results/result_voice.mp4'
@@ -742,7 +763,7 @@ def process_video(video, source_language, target_language, use_wav2lip, whisper_
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("# ViDubb")
-    gr.Markdown("This tool uses AI to dub videos into different languages!")
+    gr.Markdown("This tool uses AI to dub videos into different languages with enhanced translation and TTS capabilities!")
     
     with gr.Row():
         with gr.Column(scale=2):
@@ -781,6 +802,13 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
                     info="Use Google Cloud Text-to-Speech for higher quality voices (requires Google Cloud credentials)."
                 )
                 
+                translation_provider = gr.Dropdown(
+                    choices=["auto", "openrouter", "groq"],
+                    label="Translation Provider",
+                    value="auto",
+                    info="Choose translation service: Auto (best available), OpenRouter (premium), or Groq (fast)"
+                )
+                
                 submit_button = gr.Button("Process Video", variant="primary")
         
         with gr.Column(scale=2):
@@ -789,7 +817,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
 
     submit_button.click(
         process_video, 
-        inputs=[video, source_language, target_language, use_wav2lip, whisper_model, bg_sound, use_google_tts], 
+        inputs=[video, source_language, target_language, use_wav2lip, whisper_model, bg_sound, use_google_tts, translation_provider], 
         outputs=[output_video, error_message]
     )
 

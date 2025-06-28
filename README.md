@@ -62,6 +62,27 @@ ViDubb now supports Google Cloud Text-to-Speech (TTS) for even higher quality vo
 4. **Enable in Interface**:
    - Check the "Use Google Cloud TTS" option in the Gradio interface
 
+### 🌐 Enhanced Translation with OpenRouter + Groq
+
+ViDubb now features advanced translation capabilities with multiple AI providers:
+
+- **OpenRouter Integration**: Access to premium models like Claude 3.5 Sonnet, GPT-4, and Gemini Pro
+- **Groq Support**: Fast inference with Llama 3 models
+- **Automatic Fallback**: Intelligent provider selection for best results
+- **Context-Aware Translation**: Better accuracy with sentence context
+
+#### Setting up Translation APIs
+
+1. **OpenRouter API** (Premium):
+   - Sign up at [OpenRouter](https://openrouter.ai/)
+   - Get your API key from the dashboard
+   - Add to `.env`: `OPENROUTER_API_KEY=your_key_here`
+
+2. **Groq API** (Fast & Free):
+   - Sign up at [Groq](https://console.groq.com/)
+   - Get your API key
+   - Add to `.env`: `GROQ_TOKEN=your_key_here`
+
 ---
 
 ## Examples 
@@ -137,6 +158,7 @@ Leveraging state-of-the-art AI, **ViDubb** sets new standards in dubbing accurac
 - **Multi-Language Support**: Offers dubbing in a variety of languages, ensuring broad global accessibility.
 - **AI Voice Cloning**: Creates realistic, high-quality voiceovers that capture the tone and emotion of the original content.
 - **Google Cloud TTS Integration**: Premium voice synthesis with Google's neural voices for enhanced quality.
+- **Enhanced Translation APIs**: OpenRouter and Groq integration for superior translation accuracy.
 - **Dynamic Lip-Sync Technology**: Ensures perfect synchronization with video visuals, even when multiple speakers are involved, enhancing realism and interactivity.
 - **Background Sound Preservation**: Retains original background sounds to maintain the authenticity of the video.
 - **Efficient Dubbing Process**: Streamlines the video dubbing workflow, enabling faster and more cost-effective localization.
@@ -159,6 +181,7 @@ Our mission is to provide an efficient and high-quality AI-driven dubbing soluti
 - [ ] Deploy ViDubb on Docker hub
 - [ ] ADD subtitles feature
 - [x] Google Cloud TTS Integration
+- [x] OpenRouter API Integration
       
 
 ---
@@ -205,6 +228,9 @@ Before starting, ensure you have [Anaconda](https://docs.anaconda.com/anaconda/i
     HF_TOKEN="your_huggingface_token"
     Groq_TOKEN="your_groq_token"
     
+    # OpenRouter API Configuration (Optional - for premium translation)
+    OPENROUTER_API_KEY="your_openrouter_api_key"
+    
     # Google Cloud TTS Configuration (Optional)
     GOOGLE_CLOUD_CREDENTIALS_PATH="path/to/your/google-cloud-credentials.json"
     USE_GOOGLE_TTS=false
@@ -214,6 +240,8 @@ Before starting, ensure you have [Anaconda](https://docs.anaconda.com/anaconda/i
 > You can obtain your `HF_TOKEN` from [Hugging Face](https://huggingface.co/settings/tokens) to use the **speaker separation**, make sure to request access to [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1).
 > 
 > You can obtain your `Groq_TOKEN` from [GroqCloud](https://console.groq.com/keys) to use the free API model 'llama3-70b' for translation instead of the standard model (optional).
+>
+> You can obtain your `OPENROUTER_API_KEY` from [OpenRouter](https://openrouter.ai/) for access to premium translation models like Claude 3.5 Sonnet and GPT-4.
 
 
 > [!TIP]
@@ -382,8 +410,9 @@ The provided code implements a robust video dubbing pipeline, leveraging various
 
 **- Text Translation**
 * **Technical Implementation:**
-  - **Direct Translation:** Leverages the MarianMT model, a powerful machine translation system, to translate the segmented sentences from the source language to the target language.
-  - **Context-Aware Translation (Optional):** Employs a large language model (LLM) like "llama3-70b-8192" to provide context-aware translations, improving the quality and accuracy of the translations.
+  - **Enhanced Translation Service:** Uses multiple AI providers including OpenRouter (Claude 3.5 Sonnet, GPT-4, Gemini Pro) and Groq (Llama 3 models) for superior translation quality.
+  - **Context-Aware Translation:** Provides sentence context to improve translation accuracy and maintain narrative flow.
+  - **Automatic Fallback:** Intelligently selects the best available provider and falls back to MarianMT if API services are unavailable.
 
 **- Emotion Analysis (Optional)**
 * **Technical Implementation:** Leverages a pre-trained emotion recognition model, such as the one provided by SpeechBrain, to analyze the emotions expressed in the audio segments. The model classifies emotions into categories like anger, happiness, sadness, and neutral.
@@ -410,6 +439,8 @@ By combining these techniques and leveraging the power of machine learning, the 
 - [Kaggle free Notebook](https://www.kaggle.com/)
 - [Colab free Notebook](https://colab.research.google.com/)
 - [Google Cloud Text-to-Speech](https://cloud.google.com/text-to-speech)
+- [OpenRouter](https://openrouter.ai/)
+- [Groq](https://groq.com/)
 - All open source models :)
   
 ---
