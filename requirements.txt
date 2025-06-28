@@ -49,3 +49,4 @@ grpcio-status==1.33.2
 scikit-image
 nltk==3.2.4
 gradio==5.8.0
+google-cloud-texttospeech==2.16.3

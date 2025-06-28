@@ -28,6 +28,41 @@ ViDubb is an advanced AI-powered video dubbing solution focused on delivering hi
 
 ---
 
+## New Features
+
+### 🎤 Google Cloud Text-to-Speech Integration
+
+ViDubb now supports Google Cloud Text-to-Speech (TTS) for even higher quality voice synthesis:
+
+- **Premium Voice Quality**: Access to Google's state-of-the-art neural voices
+- **Multiple Voice Options**: Choose from various voice types and genders
+- **Enhanced Language Support**: Better pronunciation and naturalness across languages
+- **Fallback System**: Automatically falls back to Coqui TTS if Google Cloud is not configured
+
+#### Setting up Google Cloud TTS
+
+1. **Create a Google Cloud Project**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the Text-to-Speech API
+
+2. **Create Service Account Credentials**:
+   - Navigate to "IAM & Admin" > "Service Accounts"
+   - Create a new service account
+   - Download the JSON credentials file
+
+3. **Configure ViDubb**:
+   - Place your credentials JSON file in the project directory
+   - Set the environment variable in your `.env` file:
+     ```
+     GOOGLE_CLOUD_CREDENTIALS_PATH=path/to/your/credentials.json
+     USE_GOOGLE_TTS=true
+     ```
+
+4. **Enable in Interface**:
+   - Check the "Use Google Cloud TTS" option in the Gradio interface
+
+---
 
 ## Examples 
 
@@ -72,7 +107,8 @@ ViDubb is an advanced AI-powered video dubbing solution focused on delivering hi
    - [6) Download Wave2Lip Models](#6-download-wave2lip-models)
    - [7) Run the Project](#7-run-the-project)
    - [8) Launch the Gradio Web App](#8-launch-the-gradio-web-app)
-4. [Detailed Features and Technical Details](#detailed-features-and-technical-details)
+4. [Google Cloud TTS Setup](#google-cloud-tts-setup)
+5. [Detailed Features and Technical Details](#detailed-features-and-technical-details)
    - [Speaker Diarization](#speaker-diarization)
    - [Lip-Sync (Optional)](#lip-sync-optional)
    - [Text Transcription](#text-transcription)
@@ -82,8 +118,8 @@ ViDubb is an advanced AI-powered video dubbing solution focused on delivering hi
    - [Audio Synthesis](#audio-synthesis)
    - [Audio and Video Synchronization](#audio-and-video-synchronization)
    - [Audio and Video Mixing](#audio-and-video-mixing)
-5. [Acknowledgment](#acknowledgment)
-6. [License](#license)
+6. [Acknowledgment](#acknowledgment)
+7. [License](#license)
 
 
 </details>
@@ -91,7 +127,7 @@ ViDubb is an advanced AI-powered video dubbing solution focused on delivering hi
 
 ## Introduction
 
-**ViDubb** (Video dubber) is an advanced AI-powered video dubbing solution designed to deliver high-quality, efficient dubbing for multilingual content. By integrating cutting-edge voice cloning technology and dynamic lip-sync synchronization, ViDubb ensures that voiceovers are perfectly aligned with the original video’s dialogue and actor movements, even when multiple speakers are involved, providing a seamless viewing experience across languages.
+**ViDubb** (Video dubber) is an advanced AI-powered video dubbing solution designed to deliver high-quality, efficient dubbing for multilingual content. By integrating cutting-edge voice cloning technology and dynamic lip-sync synchronization, ViDubb ensures that voiceovers are perfectly aligned with the original video's dialogue and actor movements, even when multiple speakers are involved, providing a seamless viewing experience across languages.
 
 Leveraging state-of-the-art AI, **ViDubb** sets new standards in dubbing accuracy and naturalness, making it ideal for global content localization, film, media, and educational purposes. The tool enables content creators and businesses to quickly adapt their videos for international audiences while maintaining top-tier audio and visual quality.
 
@@ -100,6 +136,7 @@ Leveraging state-of-the-art AI, **ViDubb** sets new standards in dubbing accurac
 - **Download Direct Video from YouTube**: Allows users to download videos directly from YouTube for immediate dubbing and localization, saving time and simplifying the workflow.
 - **Multi-Language Support**: Offers dubbing in a variety of languages, ensuring broad global accessibility.
 - **AI Voice Cloning**: Creates realistic, high-quality voiceovers that capture the tone and emotion of the original content.
+- **Google Cloud TTS Integration**: Premium voice synthesis with Google's neural voices for enhanced quality.
 - **Dynamic Lip-Sync Technology**: Ensures perfect synchronization with video visuals, even when multiple speakers are involved, enhancing realism and interactivity.
 - **Background Sound Preservation**: Retains original background sounds to maintain the authenticity of the video.
 - **Efficient Dubbing Process**: Streamlines the video dubbing workflow, enabling faster and more cost-effective localization.
@@ -121,6 +158,7 @@ Our mission is to provide an efficient and high-quality AI-driven dubbing soluti
 - [ ] Deploy ViDubb on HuggingFace space
 - [ ] Deploy ViDubb on Docker hub
 - [ ] ADD subtitles feature
+- [x] Google Cloud TTS Integration
       
 
 ---
@@ -160,12 +198,16 @@ Before starting, ensure you have [Anaconda](https://docs.anaconda.com/anaconda/i
     ```
 
 ### 3) Configure the `.env` File
-1. **Set up the `.env` file** with your Hugging Face API and Groq API tokens:
+1. **Set up the `.env` file** with your API tokens:
     - Create a `.env` file in the `ViDubb` directory.
     - Add the following lines:
     ```bash
     HF_TOKEN="your_huggingface_token"
     Groq_TOKEN="your_groq_token"
+    
+    # Google Cloud TTS Configuration (Optional)
+    GOOGLE_CLOUD_CREDENTIALS_PATH="path/to/your/google-cloud-credentials.json"
+    USE_GOOGLE_TTS=false
     ```
 > [!NOTE]
 >
@@ -279,6 +321,44 @@ By following these steps, you should be able to set up and run ViDubb for video 
 
 ---
 
+## Google Cloud TTS Setup
+
+To use Google Cloud Text-to-Speech for enhanced voice quality:
+
+### 1) Create Google Cloud Project
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Text-to-Speech API
+
+### 2) Create Service Account
+1. Navigate to "IAM & Admin" > "Service Accounts"
+2. Click "Create Service Account"
+3. Give it a name and description
+4. Grant the "Text-to-Speech Client" role
+5. Create and download the JSON key file
+
+### 3) Configure ViDubb
+1. Place the JSON credentials file in your project directory
+2. Update your `.env` file:
+   ```bash
+   GOOGLE_CLOUD_CREDENTIALS_PATH="path/to/your/google-cloud-credentials.json"
+   USE_GOOGLE_TTS=true
+   ```
+
+### 4) Verify Setup
+Run the setup verification:
+```python
+from config.google_cloud_setup import setup_google_cloud_credentials, validate_google_cloud_credentials
+
+creds_path = setup_google_cloud_credentials()
+if creds_path and validate_google_cloud_credentials(creds_path):
+    print("Google Cloud TTS is ready!")
+else:
+    print("Google Cloud TTS setup incomplete")
+```
+
+---
+
 ## Detailed Features and Technical Details
 
 
@@ -309,7 +389,9 @@ The provided code implements a robust video dubbing pipeline, leveraging various
 * **Technical Implementation:** Leverages a pre-trained emotion recognition model, such as the one provided by SpeechBrain, to analyze the emotions expressed in the audio segments. The model classifies emotions into categories like anger, happiness, sadness, and neutral.
 
 **- Audio Synthesis**
-* **Technical Implementation:** Employs a text-to-speech (TTS) system, such as the one provided by the TTS library, to synthesize audio from the translated text. The TTS system can be further customized to match the speaker's voice and emotion.
+* **Technical Implementation:** 
+  - **Coqui TTS:** Employs a text-to-speech (TTS) system, such as the one provided by the TTS library, to synthesize audio from the translated text. The TTS system can be further customized to match the speaker's voice and emotion.
+  - **Google Cloud TTS:** Uses Google's neural text-to-speech API for premium voice quality with multiple voice options and enhanced naturalness.
 
 **- Audio and Video Synchronization**
 * **Technical Implementation:** Leverages FFmpeg to synchronize the generated audio with the original video, ensuring that the lip movements align with the spoken words.
@@ -327,6 +409,7 @@ By combining these techniques and leveraging the power of machine learning, the 
 - [HuggingFace video-dubbing](https://huggingface.co/spaces/artificialguybr/video-dubbing)
 - [Kaggle free Notebook](https://www.kaggle.com/)
 - [Colab free Notebook](https://colab.research.google.com/)
+- [Google Cloud Text-to-Speech](https://cloud.google.com/text-to-speech)
 - All open source models :)
   
 ---
@@ -375,5 +458,3 @@ By combining these techniques and leveraging the power of machine learning, the 
     <!-- Content related to AI video dubbing -->
 </body>
 </html>
-
-

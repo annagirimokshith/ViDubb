@@ -17,6 +17,7 @@ install_if_not_installed('TTS', 'pip install --no-deps TTS==0.21.0')
 install_if_not_installed('packaging', 'pip install packaging==20.9')
 install_if_not_installed('openai-whisper', 'pip install openai-whisper==20240930')
 install_if_not_installed('deepface', 'pip install deepface==0.0.93')
+install_if_not_installed('google.cloud.texttospeech', 'pip install google-cloud-texttospeech==2.16.3')
 os.system('pip install numpy==1.26.4 > /dev/null 2>&1')
 
 from pyannote.audio import Pipeline
@@ -53,6 +54,8 @@ from tools.utils import detect_and_crop_faces
 from tools.utils import cosine_similarity
 from tools.utils import extract_and_save_most_common_face
 from tools.utils import get_overlap
+from tools.enhanced_tts import EnhancedTTS
+from config.google_cloud_setup import setup_google_cloud_credentials, validate_google_cloud_credentials
 
         
 nltk.download('punkt')
@@ -64,7 +67,8 @@ load_dotenv()
 class VideoDubbing:
     def __init__(self, Video_path, source_language, target_language, 
                  LipSync=True, Voice_denoising = True, whisper_model="turbo",
-                 Context_translation = "API code here", huggingface_auth_token="API code here"):
+                 Context_translation = "API code here", huggingface_auth_token="API code here",
+                 use_google_tts=False):
         
         self.Video_path = Video_path
         self.source_language = source_language
@@ -74,6 +78,7 @@ class VideoDubbing:
         self.whisper_model = whisper_model
         self.Context_translation = Context_translation
         self.huggingface_auth_token = huggingface_auth_token
+        self.use_google_tts = use_google_tts
         
         os.system("rm -r audio")
         os.system("mkdir audio")
@@ -461,12 +466,12 @@ class VideoDubbing:
         
         
         
-        os.environ["COQUI_TOS_AGREED"] = "1"
-        if device == "cuda":
-                tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=True)
-        else:
-                tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=False)
-        #!tts --model_name "tts_models/multilingual/multi-dataset/xtts_v2"  --list_speaker_idxs
+        # Initialize Enhanced TTS system
+        google_credentials_path = setup_google_cloud_credentials()
+        enhanced_tts = EnhancedTTS(
+            use_google_tts=self.use_google_tts and google_credentials_path is not None,
+            google_credentials_path=google_credentials_path
+        )
         
         os.system("rm -r audio_chunks")
         os.system("rm -r su_audio_chunks")
@@ -489,12 +494,31 @@ class VideoDubbing:
         
         for i in range(len(records)):
             print('previous_silence_time: ', previous_silence_time)
-            tts.tts_to_file(text=records[i][0],
-                        file_path=f"audio_chunks/{i}.wav",
-                        speaker_wav=f"speakers_audio/{records[i][4]}.wav",
-                        language=self.target_language,
-                        emotion=records[i][5],
-                        speed=2)
+            
+            # Use enhanced TTS system
+            if self.use_google_tts and google_credentials_path:
+                # Use Google TTS
+                audio_result = enhanced_tts.synthesize_speech(
+                    text=records[i][0],
+                    language_code=self.target_language,
+                    speed=2.0,
+                    output_path=f"audio_chunks/{i}.wav",
+                    gender='NEUTRAL'  # You can make this configurable
+                )
+            else:
+                # Use Coqui TTS (original behavior)
+                audio_result = enhanced_tts.synthesize_speech(
+                    text=records[i][0],
+                    language_code=self.target_language,
+                    speaker_wav=f"speakers_audio/{records[i][4]}.wav",
+                    emotion=records[i][5],
+                    speed=2,
+                    output_path=f"audio_chunks/{i}.wav"
+                )
+            
+            if audio_result is None:
+                print(f"Failed to synthesize audio for segment {i}")
+                continue
             
             audio = AudioSegment.from_file(f"audio_chunks/{i}.wav")
             audio = audio[:len(audio)-tip]
@@ -673,7 +697,7 @@ language_mapping = {
 }
 
 
-def process_video(video, source_language, target_language, use_wav2lip, whisper_model, bg_sound):
+def process_video(video, source_language, target_language, use_wav2lip, whisper_model, bg_sound, use_google_tts):
     try:
         os.system("rm video_path.mp4")
         video_path = None
@@ -684,7 +708,17 @@ def process_video(video, source_language, target_language, use_wav2lip, whisper_
         else:
             video_path = video
         
-        vidubb = VideoDubbing(video_path, language_mapping[source_language], language_mapping[target_language], use_wav2lip, not bg_sound, whisper_model, "", os.getenv('HF_TOKEN'))
+        vidubb = VideoDubbing(
+            video_path, 
+            language_mapping[source_language], 
+            language_mapping[target_language], 
+            use_wav2lip, 
+            not bg_sound, 
+            whisper_model, 
+            "", 
+            os.getenv('HF_TOKEN'),
+            use_google_tts
+        )
         if  use_wav2lip and not bg_sound:
             source_path = 'results/result_voice.mp4'
                 
@@ -740,6 +774,13 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
                     value=False,
                     info="Keep background sound of the original video, may introduce noise."
                 )
+                
+                use_google_tts = gr.Checkbox(
+                    label="Use Google Cloud TTS",
+                    value=False,
+                    info="Use Google Cloud Text-to-Speech for higher quality voices (requires Google Cloud credentials)."
+                )
+                
                 submit_button = gr.Button("Process Video", variant="primary")
         
         with gr.Column(scale=2):
@@ -748,7 +789,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
 
     submit_button.click(
         process_video, 
-        inputs=[video, source_language, target_language, use_wav2lip, whisper_model, bg_sound], 
+        inputs=[video, source_language, target_language, use_wav2lip, whisper_model, bg_sound, use_google_tts], 
         outputs=[output_video, error_message]
     )
 
